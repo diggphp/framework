@@ -122,6 +122,9 @@ class Framework
                 ) {
                     continue;
                 }
+                if (file_exists(self::getRoot() . '/config/' . $app . '/disabled.lock')) {
+                    continue;
+                }
                 $list[$app] = $app;
             }
 
@@ -129,6 +132,16 @@ class Framework
                 $loader = new ClassLoader();
                 foreach (glob(self::getRoot() . '/plugin/*/src/library/App.php') as $file) {
                     $app = substr($file, strlen(self::getRoot() . '/'), -strlen('/src/library/App.php'));
+
+                    require_once $file;
+
+                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\App', '/\\-'));
+                    if (
+                        !class_exists($class_name)
+                        || !is_subclass_of($class_name, AppInterface::class)
+                    ) {
+                        continue;
+                    }
 
                     if (file_exists(self::getRoot() . '/config/' . $app . '/disabled.lock')) {
                         continue;
@@ -138,15 +151,6 @@ class Framework
                         continue;
                     }
 
-                    require $file;
-
-                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\App', '/\\-'));
-                    if (
-                        !class_exists($class_name)
-                        || !is_subclass_of($class_name, AppInterface::class)
-                    ) {
-                        continue;
-                    }
                     $list[$app] = $app;
 
                     $loader->addPsr4(
