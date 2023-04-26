@@ -17,6 +17,7 @@ class Route
     private $params = [];
     private $query = [];
     private $app = null;
+    private $path = '';
 
     public function __construct(
         Factory $factory,
@@ -34,16 +35,17 @@ class Route
         $this->params = $res[4] ?? [];
         $this->query = $res[5] ?? [];
 
-        if (!$this->isFound()) {
-            $uri = (new Factory)->createUriFromGlobals();
-            $paths = explode('/', $uri->getPath());
-            $pathx = explode('/', $_SERVER['SCRIPT_NAME']);
-            foreach ($pathx as $key => $value) {
-                if (isset($paths[$key]) && ($paths[$key] == $value)) {
-                    unset($paths[$key]);
-                }
+        $paths = explode('/', $uri->getPath());
+        $pathx = explode('/', $_SERVER['SCRIPT_NAME']);
+        foreach ($pathx as $key => $value) {
+            if (isset($paths[$key]) && ($paths[$key] == $value)) {
+                unset($paths[$key]);
             }
+        }
 
+        $this->path = '/' . implode('/', $paths);
+
+        if (!$this->isFound()) {
             if (count($paths) <= 2) {
                 return;
             }
@@ -94,6 +96,12 @@ class Route
         return $this;
     }
 
+    public function setPath(string $path): self
+    {
+        $this->path = $path;
+        return $this;
+    }
+
     public function setAllowed(bool $allowed): self
     {
         $this->allowed = $allowed;
@@ -139,11 +147,6 @@ class Route
         return $this->handler;
     }
 
-    public function getApp()
-    {
-        return $this->app;
-    }
-
     public function getMiddleWares(): array
     {
         return $this->middlewares;
@@ -157,5 +160,15 @@ class Route
     public function getQuery(): array
     {
         return $this->query;
+    }
+
+    public function getApp()
+    {
+        return $this->app;
+    }
+
+    public function getPath()
+    {
+        return $this->path;
     }
 }
