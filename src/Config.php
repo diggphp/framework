@@ -12,119 +12,138 @@ class Config
 {
     private $configs = [];
 
-    public function __construct()
-    {
-        foreach (Framework::getAppList() as $app) {
-            $this->configs[$app] = [];
-        }
-    }
-
     public function get(string $key = '', $default = null)
     {
-        list($path, $package_name) = explode('@', $key);
-        $package_name = str_replace('.', '/', $package_name);
-        if (!$path) {
-            throw new InvalidArgumentException('Invalid Argument Exception');
-        }
-        if (!array_key_exists($package_name, $this->configs)) {
-            throw new InvalidArgumentException('App [' . $package_name . '] unavailable!');
+        $parse = $this->parseKey($key);
+
+        if (!isset($this->configs[$parse['key']])) {
+            $this->load($parse);
         }
 
-        $paths = array_filter(
-            explode('.', $path),
-            function ($val) {
-                return strlen($val) > 0 ? true : false;
-            }
-        );
-        static $loaded = [];
-        if (!isset($loaded[$paths[0] . '@' . $package_name])) {
-            $loaded[$paths[0] . '@' . $package_name] = true;
-            $this->load($package_name, $paths[0]);
-        }
-
-        return $this->getValue($this->configs[$package_name], $paths, $default);
+        return $this->getValue($this->configs[$parse['key']], $parse['paths'], $default);
     }
 
     public function set(string $key, $value = null): self
     {
-        list($path, $package_name) = explode('@', $key);
-        $package_name = str_replace('.', '/', $package_name);
-        if (!$path) {
-            throw new InvalidArgumentException('Invalid Argument Exception');
-        }
-        if (!array_key_exists($package_name, $this->configs)) {
-            throw new InvalidArgumentException('App [' . $package_name . '] unavailable!');
+        $parse = $this->parseKey($key);
+
+        if (!isset($this->configs[$parse['key']])) {
+            $this->load($parse);
         }
 
-        $paths = array_filter(
-            explode('.', $path),
-            function ($val) {
-                return strlen($val) > 0 ? true : false;
-            }
-        );
-        $this->setValue($this->configs[$package_name], $paths, $value);
+        $this->setValue($this->configs[$parse['key']], $parse['paths'], $value);
         return $this;
     }
 
-    private function load(string $package_name, string $key)
+    public function save(string $key, $value): self
     {
-        if (!array_key_exists($package_name, $this->configs)) {
-            throw new InvalidArgumentException('App [' . $package_name . '] unavailable!');
+        $parse = $this->parseKey($key);
+
+        if (!isset($this->configs[$parse['key']])) {
+            $this->load($parse);
         }
 
+        $res = [];
+        if (is_file($parse['config_file'])) {
+            $res = (array)$this->requireFile($parse['config_file']);
+        }
+
+        $this->setValue($res, $parse['paths'], $value);
+
+        if (!is_dir(dirname($parse['config_file']))) {
+            mkdir(dirname($parse['config_file']), 0755, true);
+        }
+
+        file_put_contents($parse['config_file'], '<?php return ' . var_export($res, true) . ';');
+
+        return $this;
+    }
+
+    private function load(array $parse)
+    {
         $args = [];
 
-        $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $package_name . '\\App', '/\\-'));
-        $reflector = new ReflectionClass($class_name);
-        $config_file = dirname(dirname($reflector->getFileName())) . '/config/' . $key . '.php';
-        if (is_file($config_file)) {
-            $tmp = $this->requireFile($config_file);
-            if (!is_null($tmp)) {
-                $args[] = $tmp;
-            }
+        if (isset($parse['default_file']) && is_file($parse['default_file'])) {
+            $tmp = $this->requireFile($parse['default_file']);
+            $args[] = (array)$tmp;
         }
 
-        $install_path = InstalledVersions::getRootPackage()['install_path'];
-        $config_file = $install_path . '/config/' . $package_name . '/' . $key . '.php';
-        if (is_file($config_file)) {
-            $tmp = $this->requireFile($config_file);
-            if (!is_null($tmp)) {
-                $args[] = $tmp;
-            }
+        if (is_file($parse['config_file'])) {
+            $tmp = $this->requireFile($parse['config_file']);
+            $args[] = (array)$tmp;
         }
 
-        if (isset($this->configs[$package_name][$key])) {
-            $args[] = $this->configs[$package_name][$key];
-        }
-
-        $this->configs[$package_name][$key] = $args ? array_merge(...$args) : null;
+        $this->configs[$parse['key']] = $args ? array_merge(...$args) : null;
     }
 
     private function getValue($data, $path, $default)
     {
-        $key = array_shift($path);
-        if (!$path) {
-            return isset($data[$key]) ? $data[$key] : $default;
-        } else {
-            if (isset($data[$key])) {
-                return $this->getValue($data[$key], $path, $default);
+        if ($path) {
+            $key = array_shift($path);
+            if (!$path) {
+                return isset($data[$key]) ? $data[$key] : $default;
             } else {
-                return $default;
+                if (isset($data[$key])) {
+                    return $this->getValue($data[$key], $path, $default);
+                } else {
+                    return $default;
+                }
             }
+        } else {
+            return $data;
         }
     }
 
     private function setValue(&$data, $path, $value)
     {
-        $key = array_shift($path);
         if ($path) {
-            if (!isset($data[$key])) {
-                $data[$key] = null;
+            $key = array_shift($path);
+            if ($path) {
+                if (!isset($data[$key])) {
+                    $data[$key] = null;
+                }
+                $this->setValue($data[$key], $path, $value);
+            } else {
+                $data[$key] = $value;
             }
-            $this->setValue($data[$key], $path, $value);
         } else {
-            $data[$key] = $value;
+            $data = $value;
         }
+    }
+
+    private function parseKey(string $key): array
+    {
+        $res = [];
+
+        list($path, $group) = explode('@', $key);
+
+        if (!$path) {
+            throw new InvalidArgumentException('Invalid Argument Exception');
+        }
+
+        $paths = array_filter(
+            explode('.', $path),
+            function ($val) {
+                return strlen($val) > 0 ? true : false;
+            }
+        );
+
+        $res['filename'] = array_shift($paths);
+        $res['paths'] = $paths;
+        $project_dir = dirname(dirname(dirname((new ReflectionClass(InstalledVersions::class))->getFileName())));
+        if (is_null($group)) {
+            $res['config_file'] = $project_dir . '/config/' . $res['filename'] . '.php';
+            $res['key'] = $res['filename'];
+        } else {
+            $group = str_replace('.', '/', $group);
+            $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $group . '\\Hook', '/\\-'));
+            $reflector = new ReflectionClass($class_name);
+            $res['default_file'] = dirname(dirname($reflector->getFileName())) . '/config/' . $res['filename'] . '.php';
+            $res['config_file'] = $project_dir . '/config/' . $group . '/' . $res['filename'] . '.php';
+            $res['key'] = $res['filename'] . '@' . $group;
+        }
+
+        return $res;
     }
 
     private function requireFile(string $file)
