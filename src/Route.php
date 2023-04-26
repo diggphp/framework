@@ -57,6 +57,7 @@ class Route
 
         if ($this->isFound()) {
             $handler = $this->getHandler();
+            $cls = null;
             if (is_array($handler) && $handler[1] == 'handle') {
                 $cls = $handler[0];
             } elseif (is_string($handler)) {
