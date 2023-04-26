@@ -240,6 +240,16 @@ class Framework
             };
         }
 
+        if ($route->getApp() && !isset(self::getAppList()[$route->getApp()])) {
+            return function (): ResponseInterface {
+                return self::execute(function (
+                    Factory $factory
+                ) {
+                    return $factory->createResponse(404);
+                });
+            };
+        }
+
         if (!$route->isAllowed()) {
             return function (): ResponseInterface {
                 return self::execute(function (
@@ -260,6 +270,16 @@ class Framework
             }
         } elseif (is_string($handler) && class_exists($handler)) {
             $handler = self::getContainer()->get($handler);
+        }
+
+        if (!is_callable($handler)) {
+            return function (): ResponseInterface {
+                return self::execute(function (
+                    Factory $factory
+                ) {
+                    return $factory->createResponse(404);
+                });
+            };
         }
 
         return function () use ($handler): ResponseInterface {

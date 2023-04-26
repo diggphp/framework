@@ -35,28 +35,6 @@ class Route
         $this->params = $res[4] ?? [];
         $this->query = $res[5] ?? [];
 
-        $paths = explode('/', $uri->getPath());
-        $pathx = explode('/', $_SERVER['SCRIPT_NAME']);
-        foreach ($pathx as $key => $value) {
-            if (isset($paths[$key]) && ($paths[$key] == $value)) {
-                unset($paths[$key]);
-            }
-        }
-
-        $this->path = '/' . implode('/', $paths);
-
-        if (!$this->isFound()) {
-            if (count($paths) <= 2) {
-                return;
-            }
-            array_splice($paths, 0, 0, 'App');
-            array_splice($paths, 3, 0, 'Http');
-            $class = str_replace(['-'], [''], ucwords(implode('\\', $paths), '\\-'));
-            $this->setFound(true);
-            $this->setAllowed(true);
-            $this->setHandler($class);
-        }
-
         if ($this->isFound()) {
             $handler = $this->getHandler();
             $cls = null;
@@ -65,21 +43,28 @@ class Route
             } elseif (is_string($handler)) {
                 $cls = $handler;
             }
-
             if ($cls) {
-                $name_paths = explode('\\', is_object($cls) ? (new ReflectionClass($cls))->getName() : $cls);
-                if (isset($name_paths[4]) && $name_paths[0] == 'App' && $name_paths[3] == 'Http') {
-                    $camel = function (string $str): string {
-                        return strtolower(preg_replace('/([A-Z])/', "-$1", lcfirst($str)));
-                    };
-                    $this->app = $camel($name_paths[1]) . '/' . $camel($name_paths[2]);
+                $paths = explode('\\', is_object($cls) ? (new ReflectionClass($cls))->getName() : $cls);
+                if (isset($paths[4]) && $paths[0] == 'App' && $paths[3] == 'Http') {
+                    $this->app = $this->camel($paths[1]) . '/' . $this->camel($paths[2]);
                 }
             }
-        }
-
-        if ($this->isFound()) {
-            if ($this->app && !isset(Framework::getAppList()[$this->app])) {
-                $this->setFound(false);
+        } else {
+            $paths = explode('/', $uri->getPath());
+            $pathx = explode('/', $_SERVER['SCRIPT_NAME']);
+            foreach ($pathx as $key => $value) {
+                if (isset($paths[$key]) && ($paths[$key] == $value)) {
+                    unset($paths[$key]);
+                }
+            }
+            if (count($paths) >= 3) {
+                array_splice($paths, 0, 0, 'App');
+                array_splice($paths, 3, 0, 'Http');
+                $class = str_replace(['-'], [''], ucwords(implode('\\', $paths), '\\-'));
+                $this->setFound(true);
+                $this->setAllowed(true);
+                $this->setHandler($class);
+                $this->app = $this->camel($paths[1]) . '/' . $this->camel($paths[2]);
             }
         }
     }
@@ -170,5 +155,10 @@ class Route
     public function getPath()
     {
         return $this->path;
+    }
+
+    private function camel(string $str): string
+    {
+        return strtolower(preg_replace('/([A-Z])/', "-$1", lcfirst($str)));
     }
 }
