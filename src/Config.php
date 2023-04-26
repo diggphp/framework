@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DiggPHP\Framework;
 
 use Composer\InstalledVersions;
+use Exception;
 use InvalidArgumentException;
 use ReflectionClass;
 
@@ -20,7 +21,11 @@ class Config
             $this->load($parse);
         }
 
-        return $this->getValue($this->configs[$parse['key']], $parse['paths'], $default);
+        if (is_null($this->configs[$parse['key']])) {
+            return $default;
+        } else {
+            return $this->getValue($this->configs[$parse['key']], $parse['paths'], $default);
+        }
     }
 
     public function set(string $key, $value = null): self
@@ -29,6 +34,10 @@ class Config
 
         if (!isset($this->configs[$parse['key']])) {
             $this->load($parse);
+        }
+
+        if (!$parse['paths'] && !is_array($value)) {
+            throw new Exception('the first level:[' . $parse['key'] . '] must be array!');
         }
 
         $this->setValue($this->configs[$parse['key']], $parse['paths'], $value);
@@ -43,9 +52,18 @@ class Config
             $this->load($parse);
         }
 
-        $res = [];
+        if (!$parse['paths'] && !is_array($value)) {
+            throw new Exception('the first level:[' . $parse['key'] . '] must be array!');
+        }
+
+        $res = null;
         if (is_file($parse['config_file'])) {
-            $res = (array)$this->requireFile($parse['config_file']);
+            $tmp = $this->requireFile($parse['config_file']);
+            if (is_array($tmp)) {
+                $res = $tmp;
+            } elseif (!is_null($tmp)) {
+                throw new Exception('the config file:[' . $parse['config_file'] . '] must return array!');
+            }
         }
 
         $this->setValue($res, $parse['paths'], $value);
@@ -65,12 +83,20 @@ class Config
 
         if (isset($parse['default_file']) && is_file($parse['default_file'])) {
             $tmp = $this->requireFile($parse['default_file']);
-            $args[] = (array)$tmp;
+            if (is_array($tmp)) {
+                $args[] = $tmp;
+            } elseif (!is_null($tmp)) {
+                throw new Exception('the config file:[' . $parse['default_file'] . '] must return array!');
+            }
         }
 
         if (is_file($parse['config_file'])) {
             $tmp = $this->requireFile($parse['config_file']);
-            $args[] = (array)$tmp;
+            if (is_array($tmp)) {
+                $args[] = $tmp;
+            } elseif (!is_null($tmp)) {
+                throw new Exception('the config file:[' . $parse['default_file'] . '] must return array!');
+            }
         }
 
         $this->configs[$parse['key']] = $args ? array_merge(...$args) : null;
@@ -78,36 +104,29 @@ class Config
 
     private function getValue($data, $path, $default)
     {
-        if ($path) {
-            $key = array_shift($path);
-            if (!$path) {
-                return isset($data[$key]) ? $data[$key] : $default;
-            } else {
-                if (isset($data[$key])) {
-                    return $this->getValue($data[$key], $path, $default);
-                } else {
-                    return $default;
-                }
-            }
-        } else {
+        $key = array_shift($path);
+
+        if (is_null($key)) {
             return $data;
         }
+
+        if (!isset($data[$key])) {
+            return $default;
+        }
+
+        return $this->getValue($data[$key], $path, $default);
     }
 
     private function setValue(&$data, $path, $value)
     {
-        if ($path) {
-            $key = array_shift($path);
-            if ($path) {
-                if (!isset($data[$key])) {
-                    $data[$key] = null;
-                }
-                $this->setValue($data[$key], $path, $value);
-            } else {
-                $data[$key] = $value;
-            }
-        } else {
+        $key = array_shift($path);
+        if (is_null($key)) {
             $data = $value;
+        } else {
+            if (!isset($data[$key])) {
+                $data[$key] = null;
+            }
+            $this->setValue($data[$key], $path, $value);
         }
     }
 

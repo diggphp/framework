@@ -6,6 +6,7 @@ namespace DiggPHP\Framework;
 
 use DiggPHP\Psr17\Factory;
 use DiggPHP\Router\Router;
+use Psr\Http\Message\UriInterface;
 use ReflectionClass;
 
 class Route
@@ -17,17 +18,14 @@ class Route
     private $params = [];
     private $query = [];
     private $app = null;
-    private $path = '';
+    private $uri = null;
 
     public function __construct(
         Factory $factory,
         Router $router
     ) {
-        $uri = $factory->createUriFromGlobals();
-        $res = $router->dispatch(
-            isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET',
-            $uri->getScheme() . '://' . $uri->getHost() . (in_array($uri->getPort(), [null, 80, 443]) ? '' : ':' . $uri->getPort()) . $uri->getPath()
-        );
+        $this->uri = $factory->createUriFromGlobals();
+        $res = $router->dispatch($_SERVER['REQUEST_METHOD'] ?? 'GET', '' . $this->uri->withQuery(''));
         $this->found = $res[0] ?? false;
         $this->allowed = $res[1] ?? false;
         $this->handler = $res[2] ?? null;
@@ -50,7 +48,7 @@ class Route
                 }
             }
         } else {
-            $paths = explode('/', $uri->getPath());
+            $paths = explode('/', $this->uri->getPath());
             $pathx = explode('/', $_SERVER['SCRIPT_NAME']);
             foreach ($pathx as $key => $value) {
                 if (isset($paths[$key]) && ($paths[$key] == $value)) {
@@ -78,12 +76,6 @@ class Route
     public function setApp(string $app): self
     {
         $this->app = $app;
-        return $this;
-    }
-
-    public function setPath(string $path): self
-    {
-        $this->path = $path;
         return $this;
     }
 
@@ -147,14 +139,14 @@ class Route
         return $this->query;
     }
 
-    public function getApp()
+    public function getApp(): string
     {
         return $this->app;
     }
 
-    public function getPath()
+    public function getUri(): UriInterface
     {
-        return $this->path;
+        return $this->uri;
     }
 
     private function camel(string $str): string

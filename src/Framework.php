@@ -8,11 +8,10 @@ use Composer\Autoload\ClassLoader;
 use Composer\InstalledVersions;
 use DiggPHP\Database\Db;
 use DiggPHP\Framework\Route;
-use DiggPHP\Psr3\LocalLogger;
 use DiggPHP\Psr11\Container;
 use DiggPHP\Psr14\Event;
 use DiggPHP\Psr15\RequestHandler;
-use DiggPHP\Psr16\LocalAdapter;
+use DiggPHP\Psr16\NullAdapter;
 use DiggPHP\Psr17\Factory;
 use DiggPHP\Request\Request;
 use DiggPHP\Responser\Emitter;
@@ -32,6 +31,7 @@ use Psr\Http\Message\UploadedFileFactoryInterface;
 use Psr\Http\Message\UriFactoryInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
 use ReflectionClass;
 use ReflectionFunction;
@@ -99,8 +99,9 @@ class Framework
                     continue;
                 }
                 $list[$app] = [
+                    'name' => $app,
                     'is_plugin' => 'false',
-                    'dir' => dirname(dirname((new ReflectionClass($class_name))->getFileName())),
+                    'dir' => dirname(dirname(dirname((new ReflectionClass($class_name))->getFileName()))),
                 ];
             }
 
@@ -127,6 +128,7 @@ class Framework
                 }
 
                 $list[$app] = [
+                    'name' => $app,
                     'is_plugin' => 'true',
                     'dir' => $project_dir . '/' . $app,
                 ];
@@ -147,8 +149,8 @@ class Framework
             $container = new Container;
             foreach (array_merge([
                 ContainerInterface::class => $container,
-                LoggerInterface::class => LocalLogger::class,
-                CacheInterface::class => LocalAdapter::class,
+                LoggerInterface::class => NullLogger::class,
+                CacheInterface::class => NullAdapter::class,
                 RequestHandlerInterface::class => RequestHandler::class,
                 ResponseFactoryInterface::class => Factory::class,
                 UriFactoryInterface::class => Factory::class,
@@ -217,7 +219,7 @@ class Framework
                 });
 
                 foreach (self::getAppList() as $app) {
-                    $template->addPath($app, $app['dir'] . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'template');
+                    $template->addPath($app['name'], $app['dir'] . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'template');
                 }
 
                 return $template;
@@ -299,7 +301,7 @@ class Framework
 
                 if (is_scalar($resp) || (is_object($resp) && method_exists($resp, '__toString'))) {
                     $response = $factory->createResponse(200);
-                    $response->getBody()->write($resp);
+                    $response->getBody()->write('' . $resp);
                     return $response;
                 } else {
                     throw new Exception('Unrecognized Response');
