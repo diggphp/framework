@@ -174,7 +174,7 @@ class Framework
                         }, get_defined_vars());?>';
                 });
 
-                foreach ($config->get('applist', []) as $app) {
+                foreach (self::getAppList() as $app) {
                     $template->addPath($app['name'], $app['dir'] . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'template');
                 }
 
@@ -187,9 +187,9 @@ class Framework
     private static function getAppList(): array
     {
         return self::execute(function (
-            Config $config
+            CacheInterface $cache
         ): array {
-            if (null == $list = $config->get('applist')) {
+            if (null == $list = $cache->get('applist!system')) {
                 $list = [];
                 foreach (array_unique(InstalledVersions::getInstalledPackages()) as $app) {
                     $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
@@ -232,7 +232,7 @@ class Framework
                         'dir' => $project_dir . '/' . $app,
                     ];
                 }
-                $config->save('applist', $list);
+                $cache->set('applist!system', $list, 86400);
             }
             return $list;
         });
