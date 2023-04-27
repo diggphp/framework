@@ -148,7 +148,7 @@ class Framework
                         'dir' => $project_dir . '/' . $app,
                     ];
                 }
-                $config->set('applist', $applist);
+                $config->save('applist', $applist);
             }
             return $applist;
         });
