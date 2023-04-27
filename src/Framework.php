@@ -59,7 +59,7 @@ class Framework
             $loader->register();
         });
 
-        self::call('onInit');
+        self::hook('onInit');
 
         self::execute(function (
             RequestHandler $requestHandler,
@@ -67,7 +67,7 @@ class Framework
             Route $route,
             Emitter $emitter
         ) {
-            self::call('onStart');
+            self::hook('onStart');
 
             foreach ($route->getMiddleWares() as $middleware) {
                 $requestHandler->appendMiddleware(is_string($middleware) ? self::getContainer()->get($middleware) : $middleware);
@@ -78,7 +78,7 @@ class Framework
 
             $emitter->emit($response);
 
-            self::call('onEnd');
+            self::hook('onEnd');
         });
     }
 
@@ -96,7 +96,7 @@ class Framework
         return call_user_func($callable, ...$args);
     }
 
-    private static function getContainer(): Container
+    public static function getContainer(): Container
     {
         static $container;
         if ($container == null) {
@@ -184,7 +184,7 @@ class Framework
         return $container;
     }
 
-    private static function getAppList(): array
+    public static function getAppList(): array
     {
         return self::execute(function (
             CacheInterface $cache
@@ -236,6 +236,16 @@ class Framework
             }
             return $list;
         });
+    }
+
+    public static function hook(string $action, array $args = [])
+    {
+        foreach (array_keys(self::getAppList()) as $app) {
+            $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
+            if (method_exists($class_name, $action)) {
+                self::execute([$class_name, $action], $args);
+            }
+        }
     }
 
     private static function renderHandler(Route $route): callable
@@ -316,15 +326,5 @@ class Framework
                 }
             });
         };
-    }
-
-    private static function call(string $action, array $args = [])
-    {
-        foreach (array_keys(self::getAppList()) as $app) {
-            $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
-            if (method_exists($class_name, $action)) {
-                self::execute([$class_name, $action], $args);
-            }
-        }
     }
 }
