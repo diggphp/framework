@@ -95,7 +95,7 @@ class Config
             if (is_array($tmp)) {
                 $args[] = $tmp;
             } elseif (!is_null($tmp)) {
-                throw new Exception('the config file:[' . $parse['default_file'] . '] must return array!');
+                throw new Exception('the config file:[' . $parse['config_file'] . '] must return array!');
             }
         }
 
