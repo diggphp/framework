@@ -174,7 +174,7 @@ class Framework
             ): ServerRequestInterface {
                 $server_request = $factory->createServerRequestFromGlobals();
                 return $server_request
-                    ->withQueryParams(array_merge($server_request->getQueryParams(), $route->getQuery()));
+                    ->withQueryParams(array_merge($server_request->getQueryParams(), $route->getParams()));
             });
 
             $container->set(Template::class, function (

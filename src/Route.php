@@ -16,7 +16,6 @@ class Route
     private $handler = null;
     private $middlewares = [];
     private $params = [];
-    private $query = [];
     private $app = null;
     private $uri = null;
 
@@ -31,7 +30,6 @@ class Route
         $this->handler = $res[2] ?? null;
         $this->middlewares = $res[3] ?? [];
         $this->params = $res[4] ?? [];
-        $this->query = $res[5] ?? [];
 
         if ($this->isFound()) {
             $handler = $this->getHandler();
@@ -73,7 +71,7 @@ class Route
         return $this;
     }
 
-    public function setApp(string $app): self
+    public function setApp(?string $app): self
     {
         $this->app = $app;
         return $this;
@@ -103,12 +101,6 @@ class Route
         return $this;
     }
 
-    public function setQuery(array $query): self
-    {
-        $this->query = $query;
-        return $this;
-    }
-
     public function isFound(): bool
     {
         return $this->found;
@@ -134,12 +126,7 @@ class Route
         return $this->params;
     }
 
-    public function getQuery(): array
-    {
-        return $this->query;
-    }
-
-    public function getApp(): string
+    public function getApp(): ?string
     {
         return $this->app;
     }
