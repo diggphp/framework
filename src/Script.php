@@ -13,7 +13,7 @@ class Script
 {
     public static function __callStatic($name, $arguments)
     {
-        if (!in_array($name, ['onInstall', 'onUpdate', 'onUninstall'])) {
+        if (!in_array($name, ['onInstall', 'onUpdate', 'onUnInstall'])) {
             return;
         }
 

@@ -11,8 +11,9 @@ use DiggPHP\Framework\Route;
 use DiggPHP\Psr11\Container;
 use DiggPHP\Psr14\Event;
 use DiggPHP\Psr15\RequestHandler;
-use DiggPHP\Psr16\NullAdapter;
+use DiggPHP\Psr16\LocalAdapter;
 use DiggPHP\Psr17\Factory;
+use DiggPHP\Psr3\LocalLogger;
 use DiggPHP\Request\Request;
 use DiggPHP\Responser\Emitter;
 use DiggPHP\Router\Router;
@@ -31,7 +32,6 @@ use Psr\Http\Message\UploadedFileFactoryInterface;
 use Psr\Http\Message\UriFactoryInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 use Psr\SimpleCache\CacheInterface;
 use ReflectionClass;
 use ReflectionFunction;
@@ -40,13 +40,28 @@ use ReflectionMethod;
 class Framework
 {
     private static $container = null;
-    public static $alias = [];
+    private static $applist = null;
 
     public static function run()
     {
         if (!class_exists(InstalledVersions::class)) {
             die('composer 2 is required!');
         }
+
+        self::execute(function () {
+            self::$applist = self::getAppList();
+            $loader = new ClassLoader();
+            $project_dir = dirname(dirname(dirname((new ReflectionClass(InstalledVersions::class))->getFileName())));
+            foreach (self::$applist as $app) {
+                if ($app['plugin']) {
+                    $loader->addPsr4(
+                        str_replace(['-', '/'], ['', '\\'], ucwords('App\\' . $app['name'] . '\\', '/\\-')),
+                        $project_dir . '/' . $app['name'] . '/src/library/'
+                    );
+                }
+            }
+            $loader->register();
+        });
 
         self::call('onInit');
 
@@ -85,72 +100,69 @@ class Framework
         return call_user_func($callable, ...$args);
     }
 
-    public static function getAppList(): array
+    private static function getAppList(): array
     {
-        static $list;
-        if (is_null($list)) {
-            $list = [];
-            foreach (array_unique(InstalledVersions::getInstalledPackages()) as $app) {
-                $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
-                if (
-                    !class_exists($class_name)
-                    || !is_subclass_of($class_name, HookInterface::class)
-                ) {
-                    continue;
+        return self::execute(function (
+            Config $config
+        ): array {
+            if (null == $applist = $config->get('applist')) {
+                $applist = [];
+                foreach (array_unique(InstalledVersions::getInstalledPackages()) as $app) {
+                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
+                    if (
+                        !class_exists($class_name)
+                        || !is_subclass_of($class_name, HookInterface::class)
+                    ) {
+                        continue;
+                    }
+                    $applist[$app] = [
+                        'name' => $app,
+                        'plugin' => false,
+                        'dir' => dirname(dirname(dirname((new ReflectionClass($class_name))->getFileName()))),
+                    ];
                 }
-                $list[$app] = [
-                    'name' => $app,
-                    'is_plugin' => 'false',
-                    'dir' => dirname(dirname(dirname((new ReflectionClass($class_name))->getFileName()))),
-                ];
+
+                $project_dir = dirname(dirname(dirname((new ReflectionClass(InstalledVersions::class))->getFileName())));
+                foreach (glob($project_dir . '/plugin/*/src/library/Hook.php') as $file) {
+                    $app = substr($file, strlen($project_dir . '/'), -strlen('/src/library/Hook.php'));
+
+                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
+                    if (
+                        !class_exists($class_name)
+                        || !is_subclass_of($class_name, HookInterface::class)
+                    ) {
+                        continue;
+                    }
+
+                    if (file_exists($project_dir . '/config/' . $app . '/disabled.lock')) {
+                        continue;
+                    }
+
+                    if (!file_exists($project_dir . '/config/' . $app . '/install.lock')) {
+                        continue;
+                    }
+
+                    $applist[$app] = [
+                        'name' => $app,
+                        'plugin' => true,
+                        'dir' => $project_dir . '/' . $app,
+                    ];
+                }
+                $config->set('applist', $applist);
             }
-
-            $loader = new ClassLoader();
-            $project_dir = dirname(dirname(dirname((new ReflectionClass(InstalledVersions::class))->getFileName())));
-            foreach (glob($project_dir . '/plugin/*/src/library/Hook.php') as $file) {
-                $app = substr($file, strlen($project_dir . '/'), -strlen('/src/library/Hook.php'));
-                require_once $file;
-
-                $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
-                if (
-                    !class_exists($class_name)
-                    || !is_subclass_of($class_name, HookInterface::class)
-                ) {
-                    continue;
-                }
-
-                if (file_exists($project_dir . '/config/' . $app . '/disabled.lock')) {
-                    continue;
-                }
-
-                if (!file_exists($project_dir . '/config/' . $app . '/install.lock')) {
-                    continue;
-                }
-
-                $list[$app] = [
-                    'name' => $app,
-                    'is_plugin' => 'true',
-                    'dir' => $project_dir . '/' . $app,
-                ];
-
-                $loader->addPsr4(
-                    str_replace(['-', '/'], ['', '\\'], ucwords('App\\' . $app . '\\', '/\\-')),
-                    $project_dir . '/' . $app . '/src/library/'
-                );
-            }
-            $loader->register();
-        }
-        return $list;
+            return $applist;
+        });
     }
 
     private static function getContainer(): Container
     {
         if (self::$container == null) {
             $container = new Container;
+            $config = new Config;
             foreach (array_merge([
                 ContainerInterface::class => $container,
-                LoggerInterface::class => NullLogger::class,
-                CacheInterface::class => NullAdapter::class,
+                LoggerInterface::class => LocalLogger::class,
+                CacheInterface::class => LocalAdapter::class,
                 RequestHandlerInterface::class => RequestHandler::class,
                 ResponseFactoryInterface::class => Factory::class,
                 UriFactoryInterface::class => Factory::class,
@@ -160,8 +172,9 @@ class Framework
                 UploadedFileFactoryInterface::class => Factory::class,
                 EventDispatcherInterface::class => Event::class,
                 ListenerProviderInterface::class => Event::class,
-            ], self::$alias, [
+            ], $config->get('alias', []), [
                 Container::class => $container,
+                Config::class => $config,
             ]) as $key => $obj) {
                 $container->set($key, function () use ($obj, $container) {
                     return is_string($obj) ? $container->get($obj) : $obj;
@@ -218,7 +231,7 @@ class Framework
                         }, get_defined_vars());?>';
                 });
 
-                foreach (self::getAppList() as $app) {
+                foreach ($config->get('applist', []) as $app) {
                     $template->addPath($app['name'], $app['dir'] . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'template');
                 }
 
@@ -242,7 +255,7 @@ class Framework
             };
         }
 
-        if ($route->getApp() && !isset(self::getAppList()[$route->getApp()])) {
+        if ($route->getApp() && !isset(self::$applist[$route->getApp()])) {
             return function (): ResponseInterface {
                 return self::execute(function (
                     Factory $factory
@@ -312,7 +325,7 @@ class Framework
 
     private static function call(string $action, array $args = [])
     {
-        foreach (array_keys(self::getAppList()) as $app) {
+        foreach (array_keys(self::$applist) as $app) {
             $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
             if (method_exists($class_name, $action)) {
                 self::execute([$class_name, $action], $args);

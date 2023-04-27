@@ -134,9 +134,9 @@ class Config
     {
         $res = [];
 
-        list($path, $group) = explode('@', $key);
+        list($path, $group) = explode('@', $key . '@');
 
-        if (!$path) {
+        if (!strlen($path)) {
             throw new InvalidArgumentException('Invalid Argument Exception');
         }
 
@@ -150,7 +150,7 @@ class Config
         $res['filename'] = array_shift($paths);
         $res['paths'] = $paths;
         $project_dir = dirname(dirname(dirname((new ReflectionClass(InstalledVersions::class))->getFileName())));
-        if (is_null($group)) {
+        if (!strlen($group)) {
             $res['config_file'] = $project_dir . '/config/' . $res['filename'] . '.php';
             $res['key'] = $res['filename'];
         } else {

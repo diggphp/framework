@@ -15,7 +15,7 @@ composer require diggphp/framework
     "scripts": {
         "post-package-install": "DiggPHP\\Framework\\Script::onInstall",
         "post-package-update": "DiggPHP\\Framework\\Script::onUpdate",
-        "pre-package-uninstall": "DiggPHP\\Framework\\Script::onUninstall"
+        "pre-package-uninstall": "DiggPHP\\Framework\\Script::onUnInstall"
     }
 }
 ```
