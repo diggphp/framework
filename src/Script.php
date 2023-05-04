@@ -37,9 +37,9 @@ class Script
         } else {
             $package_name = $operation->getPackage()->getName();
         }
-        $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $package_name . '\\Hook', '/\\-'));
+        $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $package_name . '\\App', '/\\-'));
 
-        if (!class_exists($class_name) || !is_subclass_of($class_name, HookInterface::class)) {
+        if (!class_exists($class_name) || !is_subclass_of($class_name, AppInterface::class)) {
             return;
         }
 

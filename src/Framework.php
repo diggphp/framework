@@ -41,6 +41,12 @@ class Framework
 {
     public static function run()
     {
+        static $run;
+        if ($run) {
+            return;
+        }
+        $run = true;
+
         if (!class_exists(InstalledVersions::class)) {
             die('composer 2 is required!');
         }
@@ -140,6 +146,7 @@ class Framework
                 Router $router,
                 Container $container,
                 LoggerInterface $logger,
+                Widget $widget,
                 CacheInterface $cache
             ): Template {
                 $template = new Template($cache);
@@ -149,11 +156,15 @@ class Framework
                     'logger' => $logger,
                     'router' => $router,
                     'config' => $config,
+                    'widget' => $widget,
                     'request' => $request,
                     'template' => $template,
                     'container' => $container,
                 ]);
 
+                $template->extend('/\{widget\s*([\w\-_\.,@\/]*)\}/Ui', function ($matchs) {
+                    return '<?php echo $widget->get(\'' . $matchs[1] . '\') ?>';
+                });
                 $template->extend('/\{cache\s*(.*)\s*\}([\s\S]*)\{\/cache\}/Ui', function ($matchs) {
                     $params = array_filter(explode(',', trim($matchs[1])));
                     if (!isset($params[0])) {
@@ -192,10 +203,10 @@ class Framework
             if (null == $list = $cache->get('applist!system')) {
                 $list = [];
                 foreach (array_unique(InstalledVersions::getInstalledPackages()) as $app) {
-                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
+                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\App', '/\\-'));
                     if (
                         !class_exists($class_name)
-                        || !is_subclass_of($class_name, HookInterface::class)
+                        || !is_subclass_of($class_name, AppInterface::class)
                     ) {
                         continue;
                     }
@@ -207,13 +218,13 @@ class Framework
                 }
 
                 $project_dir = dirname(dirname(dirname((new ReflectionClass(InstalledVersions::class))->getFileName())));
-                foreach (glob($project_dir . '/plugin/*/src/library/Hook.php') as $file) {
-                    $app = substr($file, strlen($project_dir . '/'), -strlen('/src/library/Hook.php'));
+                foreach (glob($project_dir . '/plugin/*/src/library/App.php') as $file) {
+                    $app = substr($file, strlen($project_dir . '/'), -strlen('/src/library/App.php'));
 
-                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
+                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\App', '/\\-'));
                     if (
                         !class_exists($class_name)
-                        || !is_subclass_of($class_name, HookInterface::class)
+                        || !is_subclass_of($class_name, AppInterface::class)
                     ) {
                         continue;
                     }
@@ -241,7 +252,7 @@ class Framework
     public static function hook(string $action, array $args = [])
     {
         foreach (array_keys(self::getAppList()) as $app) {
-            $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\Hook', '/\\-'));
+            $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\App', '/\\-'));
             if (method_exists($class_name, $action)) {
                 self::execute([$class_name, $action], $args);
             }
