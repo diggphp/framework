@@ -203,7 +203,7 @@ class Framework
             if (null == $list = $cache->get('applist!system')) {
                 $list = [];
                 foreach (array_unique(InstalledVersions::getInstalledPackages()) as $app) {
-                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\App', '/\\-'));
+                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('App\\' . $app . '\\App', '/\\-'));
                     if (
                         !class_exists($class_name)
                         || !is_subclass_of($class_name, AppInterface::class)
@@ -221,7 +221,7 @@ class Framework
                 foreach (glob($project_dir . '/plugin/*/src/library/App.php') as $file) {
                     $app = substr($file, strlen($project_dir . '/'), -strlen('/src/library/App.php'));
 
-                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\App', '/\\-'));
+                    $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('App\\' . $app . '\\App', '/\\-'));
                     if (
                         !class_exists($class_name)
                         || !is_subclass_of($class_name, AppInterface::class)
@@ -252,7 +252,7 @@ class Framework
     public static function hook(string $action, array $args = [])
     {
         foreach (array_keys(self::getAppList()) as $app) {
-            $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $app . '\\App', '/\\-'));
+            $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('App\\' . $app . '\\App', '/\\-'));
             if (method_exists($class_name, $action)) {
                 self::execute([$class_name, $action], $args);
             }

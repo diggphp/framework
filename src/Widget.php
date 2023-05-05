@@ -35,7 +35,7 @@ class Widget
             $widget_file = $project_dir . '/widget/' . $filename . '.php';
         } else {
             $group = str_replace('.', '/', $group);
-            $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('\\App\\' . $group . '\\App', '/\\-'));
+            $class_name = str_replace(['-', '/'], ['', '\\'], ucwords('App\\' . $group . '\\App', '/\\-'));
             $reflector = new ReflectionClass($class_name);
             $widget_file = dirname(dirname($reflector->getFileName())) . '/widget/' . $filename . '.php';
         }
