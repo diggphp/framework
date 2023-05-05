@@ -17,6 +17,7 @@ use DiggPHP\Psr3\LocalLogger;
 use DiggPHP\Request\Request;
 use DiggPHP\Responser\Emitter;
 use DiggPHP\Router\Router;
+use DiggPHP\Session\Session;
 use DiggPHP\Template\Template;
 use Exception;
 use Psr\Container\ContainerInterface;
@@ -143,6 +144,7 @@ class Framework
                 Db $db,
                 Request $request,
                 Config $config,
+                Session $session,
                 Router $router,
                 Container $container,
                 LoggerInterface $logger,
@@ -153,6 +155,7 @@ class Framework
                 $template->assign([
                     'db' => $db,
                     'cache' => $cache,
+                    'session' => $session,
                     'logger' => $logger,
                     'router' => $router,
                     'config' => $config,
