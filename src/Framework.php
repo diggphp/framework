@@ -192,6 +192,13 @@ class Framework
                     $template->addPath($app['name'], $app['dir'] . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'template');
                 }
 
+                if ($theme = $config->get('theme.name', '')) {
+                    $project_dir = dirname(dirname(dirname((new ReflectionClass(InstalledVersions::class))->getFileName())));
+                    foreach (self::getAppList() as $app) {
+                        $template->addPath($app['name'], $project_dir . '/theme/' . $theme . '/' . $app['name'], 99);
+                    }
+                }
+
                 return $template;
             });
         }
